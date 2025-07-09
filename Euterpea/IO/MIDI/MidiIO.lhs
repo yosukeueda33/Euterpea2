@@ -38,6 +38,10 @@
 > import System.IO (hPutStrLn, stderr)
 > import System.IO.Unsafe (unsafePerformIO)
 > import Control.DeepSeq (NFData)
+> import qualified Data.ByteString.Lazy as BL
+> import Foreign.C.Types
+> import Data.Int
+> import Data.Word
 
 
 ----------------------------
@@ -500,6 +504,12 @@ use one and when to use the other.
 
 A conversion function from Codec.Midi Messages to PortMidi PMMsgs.
 
+> getByteAtLazy :: BL.ByteString -> Int64 -> Word8
+> getByteAtLazy bs idx =
+>   if idx >= 0 && idx < BL.length bs
+>     then BL.index bs idx
+>     else 0
+
 > midiEvent :: Message -> Maybe PMMsg
 > midiEvent (NoteOff c p v)         = Just $ PMMsg (128 .|. (fromIntegral c .&. 0xF)) (fromIntegral p) (fromIntegral v)
 > midiEvent (NoteOn c p v)          = Just $ PMMsg (144 .|. (fromIntegral c .&. 0xF)) (fromIntegral p) (fromIntegral v)
@@ -509,6 +519,8 @@ A conversion function from Codec.Midi Messages to PortMidi PMMsgs.
 > midiEvent (ChannelPressure c pr)  = Just $ PMMsg (208 .|. (fromIntegral c .&. 0xF)) (fromIntegral pr) 0
 > midiEvent (PitchWheel c pb)       = Just $ PMMsg (224 .|. (fromIntegral c .&. 0xF)) (fromIntegral lo) (fromIntegral hi)
 >  where (hi,lo) = (pb `shiftR` 8, pb .&. 0xFF)
+> midiEvent (Reserved i bs)         = Just $ PMMsg (f 0) (f 1) (f 2)
+>   where f = fromIntegral . getByteAtLazy (BL.reverse bs)
 > midiEvent _ = Nothing
 
 
