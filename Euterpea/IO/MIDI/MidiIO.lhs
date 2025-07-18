@@ -20,6 +20,7 @@
 >                        getDefaultOutputDeviceID, getDefaultInputDeviceID,
 >                        openInput, openOutput, readEvents,
 >                        close, writeShort, getErrorText, terminate, initialize,
+>                        writeSysEx,
 >                        PMStream, PMError (..),
 >                        PMEvent (..), PMMsg (PMMsg), 
 >                        encodeMsg, decodeMsg,
@@ -39,6 +40,7 @@
 > import System.IO.Unsafe (unsafePerformIO)
 > import Control.DeepSeq (NFData)
 > import qualified Data.ByteString.Lazy as BL
+> import qualified Data.ByteString.Lazy.Char8 as BLC8
 > import Foreign.C.Types
 > import Data.Int
 > import Data.Word
@@ -422,11 +424,19 @@ use one and when to use the other.
 >         Just s -> do
 >           if isTrackEnd msg
 >               then return ()
->               else case midiEvent msg of
->                 Just m  -> writeMsg s t $ encodeMsg m
->                 Nothing -> return ()
+>               else case msg of
+>                 msg'@(Sysex n bs) -> writeSysEx' s t n bs
+>                 _ -> case midiEvent msg of
+>                   Just m  -> writeMsg s t $ encodeMsg m
+>                   Nothing -> return ()
 >     writeMsg s t m = do
 >               e <- writeShort s (PMEvent m (round (t * 1e3)))
+>               case e of
+>                 Left e' -> reportError "midiOutRealTime'" e'
+>                 Right _ -> return ()
+>     writeSysEx' :: PMStream -> Time -> Int -> BL.ByteString -> IO ()
+>     writeSysEx' s t n bs = do
+>               e <- writeSysEx s (round (t * 1e3)) $ BLC8.unpack bs
 >               case e of
 >                 Left e' -> reportError "midiOutRealTime'" e'
 >                 Right _ -> return ()
